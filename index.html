@@ -789,6 +789,7 @@
             canvasCtx.restore();
 
             // ไอคอนผลไม้/อุปสรรค วาดตั้งตรงเสมอ (ไม่หมุนตามแผ่นพื้นหลัง) เพื่อให้อ่านง่ายที่สุด
+            canvasCtx.scale(-1, 1); // แก้ไอคอนกลับด้าน เพราะแคนวาสถูก mirror ด้วย CSS
             canvasCtx.font = `${item.radius * 1.75}px sans-serif`;
             canvasCtx.textAlign = 'center';
             canvasCtx.textBaseline = 'middle';
@@ -854,13 +855,15 @@
                 }
                 canvasCtx.save();
                 canvasCtx.globalAlpha = Math.max(t.life, 0);
+                canvasCtx.translate(t.x, t.y);
+                canvasCtx.scale(-1, 1); // แก้ตัวอักษรกลับด้าน เพราะแคนวาสถูก mirror ด้วย CSS
                 canvasCtx.fillStyle = t.color;
                 canvasCtx.font = "bold 34px 'Mitr', sans-serif";
                 canvasCtx.textAlign = 'center';
                 canvasCtx.strokeStyle = 'rgba(0,0,0,0.55)';
                 canvasCtx.lineWidth = 4;
-                canvasCtx.strokeText(t.text, t.x, t.y);
-                canvasCtx.fillText(t.text, t.x, t.y);
+                canvasCtx.strokeText(t.text, 0, 0);
+                canvasCtx.fillText(t.text, 0, 0);
                 canvasCtx.restore();
             }
         }
