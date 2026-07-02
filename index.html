@@ -617,14 +617,14 @@
 
         // --- การสร้างไอเทมผลไม้และอุปสรรคหล่นลงมา ---
         const fruits = [
-            { icon: "🍎", score: 10, isBomb: false },
-            { icon: "🍊", score: 10, isBomb: false },
-            { icon: "🍌", score: 10, isBomb: false },
-            { icon: "🍇", score: 15, isBomb: false },
-            { icon: "🍓", score: 15, isBomb: false },
-            { icon: "🍉", score: 20, isBomb: false },
-            { icon: "💣", score: 0, isBomb: true }, // ระเบิด
-            { icon: "🪨", score: 0, isBomb: true }  // หินกีดขวาง
+            { type: "apple", score: 10, isBomb: false },
+            { type: "orange", score: 10, isBomb: false },
+            { type: "banana", score: 10, isBomb: false },
+            { type: "grape", score: 15, isBomb: false },
+            { type: "strawberry", score: 15, isBomb: false },
+            { type: "watermelon", score: 20, isBomb: false },
+            { type: "bomb", score: 0, isBomb: true }, // ระเบิด
+            { type: "rock", score: 0, isBomb: true }  // หินกีดขวาง
         ];
 
         function spawnItem() {
@@ -635,7 +635,7 @@
                 let pool = fruits.filter(f => isHazard ? f.isBomb : !f.isBomb);
                 if (pool.length === 0) pool = fruits.filter(f => !f.isBomb);
 
-                const type = pool[Math.floor(Math.random() * pool.length)];
+                const picked = pool[Math.floor(Math.random() * pool.length)];
                 const radius = 48 + Math.random() * 14;
                 gameItems.push({
                     x: Math.random() * (canvasElement.width - 140) + 70,
@@ -643,9 +643,9 @@
                     speed: theme.itemSpeed + (Math.random() * 1.5),
                     rotation: 0,
                     rotSpeed: (Math.random() - 0.5) * 0.08,
-                    icon: type.icon,
-                    score: type.score,
-                    isBomb: type.isBomb,
+                    type: picked.type,
+                    score: picked.score,
+                    isBomb: picked.isBomb,
                     radius: radius
                 });
             }
@@ -762,42 +762,309 @@
             canvasCtx.save();
             canvasCtx.translate(item.x, item.y);
 
-            // แผ่นพื้นหลังทึบแสง ช่วยให้ไอเทมเด่นชัดจากภาพกล้องด้านหลังเสมอ
-            canvasCtx.save();
-            canvasCtx.rotate(item.rotation);
-            const plateRadius = item.radius * 1.08;
-
-            canvasCtx.shadowColor = 'rgba(0,0,0,0.5)';
-            canvasCtx.shadowBlur = 16;
-            canvasCtx.shadowOffsetY = 6;
+            // เงาใต้ไอเทมให้ดูมีมิติลอยอยู่กลางอากาศ
             canvasCtx.beginPath();
-            canvasCtx.arc(0, 0, plateRadius, 0, Math.PI * 2);
-            canvasCtx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+            canvasCtx.ellipse(item.radius * 0.08, item.radius * 0.95, item.radius * 0.65, item.radius * 0.18, 0, 0, Math.PI * 2);
+            canvasCtx.fillStyle = 'rgba(0,0,0,0.28)';
             canvasCtx.fill();
-            canvasCtx.shadowBlur = 0;
-            canvasCtx.shadowOffsetY = 0;
 
-            // ขอบสีแยกประเภทให้เห็นชัดเจนแต่ไกล: เขียว = ผลไม้เก็บได้, แดง = อันตรายห้ามโดน
+            // แสงเตือนสีแดงจางๆ รอบสิ่งกีดขวางอันตราย (ไม่ใช่วงกลมทึบ)
             if (item.isBomb) {
-                canvasCtx.shadowColor = '#ff1744';
-                canvasCtx.shadowBlur = 18;
+                const aura = canvasCtx.createRadialGradient(0, 0, item.radius * 0.6, 0, 0, item.radius * 1.6);
+                aura.addColorStop(0, 'rgba(255,23,68,0.32)');
+                aura.addColorStop(1, 'rgba(255,23,68,0)');
+                canvasCtx.fillStyle = aura;
+                canvasCtx.beginPath();
+                canvasCtx.arc(0, 0, item.radius * 1.6, 0, Math.PI * 2);
+                canvasCtx.fill();
             }
-            canvasCtx.lineWidth = 6;
-            canvasCtx.strokeStyle = item.isBomb ? '#ff1744' : '#43a047';
+
+            canvasCtx.rotate(item.rotation);
+            canvasCtx.shadowColor = 'rgba(0,0,0,0.35)';
+            canvasCtx.shadowBlur = 10;
+            canvasCtx.shadowOffsetY = 4;
+            drawFruitShape(item.type, item.radius);
+
+            canvasCtx.restore();
+        }
+
+        // --- ภาพวาดผลไม้/สิ่งกีดขวางแบบเวกเตอร์สีสันสดใส (ไม่ใช้อีโมจิ ไม่มีวงกลมพื้นหลัง) ---
+        function drawFruitShape(type, r) {
+            switch (type) {
+                case 'apple': drawApple(r); break;
+                case 'orange': drawOrange(r); break;
+                case 'banana': drawBanana(r); break;
+                case 'grape': drawGrape(r); break;
+                case 'strawberry': drawStrawberry(r); break;
+                case 'watermelon': drawWatermelon(r); break;
+                case 'bomb': drawBomb(r); break;
+                case 'rock': drawRock(r); break;
+                default: drawApple(r);
+            }
+        }
+
+        function drawApple(r) {
+            canvasCtx.strokeStyle = '#7a4b23';
+            canvasCtx.lineWidth = r * 0.12;
+            canvasCtx.lineCap = 'round';
+            canvasCtx.beginPath();
+            canvasCtx.moveTo(r * 0.05, -r * 0.78);
+            canvasCtx.quadraticCurveTo(r * 0.28, -r * 1.05, r * 0.14, -r * 1.18);
             canvasCtx.stroke();
-            canvasCtx.shadowBlur = 0;
+
+            canvasCtx.fillStyle = '#66bb6a';
+            canvasCtx.beginPath();
+            canvasCtx.ellipse(r * 0.32, -r * 0.95, r * 0.26, r * 0.14, -0.6, 0, Math.PI * 2);
+            canvasCtx.fill();
+
+            const grad = canvasCtx.createRadialGradient(-r * 0.35, -r * 0.35, r * 0.1, 0, 0, r * 1.05);
+            grad.addColorStop(0, '#ffab91');
+            grad.addColorStop(0.45, '#f4432f');
+            grad.addColorStop(1, '#b71c1c');
+            canvasCtx.fillStyle = grad;
+            canvasCtx.beginPath();
+            canvasCtx.moveTo(0, -r * 0.7);
+            canvasCtx.bezierCurveTo(r * 0.55, -r * 0.95, r, -r * 0.3, r * 0.85, r * 0.25);
+            canvasCtx.bezierCurveTo(r * 0.7, r * 0.95, r * 0.15, r, 0, r * 0.82);
+            canvasCtx.bezierCurveTo(-r * 0.15, r, -r * 0.7, r * 0.95, -r * 0.85, r * 0.25);
+            canvasCtx.bezierCurveTo(-r, -r * 0.3, -r * 0.55, -r * 0.95, 0, -r * 0.7);
+            canvasCtx.closePath();
+            canvasCtx.fill();
+
+            canvasCtx.fillStyle = 'rgba(255,255,255,0.4)';
+            canvasCtx.beginPath();
+            canvasCtx.ellipse(-r * 0.32, -r * 0.1, r * 0.16, r * 0.3, -0.4, 0, Math.PI * 2);
+            canvasCtx.fill();
+        }
+
+        function drawOrange(r) {
+            canvasCtx.strokeStyle = '#5d4037';
+            canvasCtx.lineWidth = r * 0.08;
+            canvasCtx.beginPath();
+            canvasCtx.moveTo(0, -r * 0.95);
+            canvasCtx.lineTo(0, -r * 1.1);
+            canvasCtx.stroke();
+            canvasCtx.fillStyle = '#66bb6a';
+            canvasCtx.beginPath();
+            canvasCtx.ellipse(r * 0.2, -r * 1.02, r * 0.22, r * 0.12, -0.5, 0, Math.PI * 2);
+            canvasCtx.fill();
+
+            const grad = canvasCtx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r);
+            grad.addColorStop(0, '#ffcc80');
+            grad.addColorStop(0.5, '#fb8c00');
+            grad.addColorStop(1, '#e65100');
+            canvasCtx.fillStyle = grad;
+            canvasCtx.beginPath();
+            canvasCtx.arc(0, 0, r, 0, Math.PI * 2);
+            canvasCtx.fill();
+
+            canvasCtx.fillStyle = 'rgba(230,81,0,0.35)';
+            for (let i = 0; i < 8; i++) {
+                const a = (i / 8) * Math.PI * 2 + 0.3;
+                const dist = r * 0.55;
+                canvasCtx.beginPath();
+                canvasCtx.arc(Math.cos(a) * dist, Math.sin(a) * dist, r * 0.06, 0, Math.PI * 2);
+                canvasCtx.fill();
+            }
+
+            canvasCtx.fillStyle = 'rgba(255,255,255,0.35)';
+            canvasCtx.beginPath();
+            canvasCtx.ellipse(-r * 0.3, -r * 0.3, r * 0.18, r * 0.28, -0.4, 0, Math.PI * 2);
+            canvasCtx.fill();
+        }
+
+        function drawBanana(r) {
+            canvasCtx.save();
+            canvasCtx.rotate(-0.15);
+            const grad = canvasCtx.createLinearGradient(-r, -r * 0.4, r, r * 0.4);
+            grad.addColorStop(0, '#8d6e00');
+            grad.addColorStop(0.15, '#fdd835');
+            grad.addColorStop(0.85, '#fff176');
+            grad.addColorStop(1, '#8d6e00');
+            canvasCtx.fillStyle = grad;
+            canvasCtx.beginPath();
+            canvasCtx.moveTo(-r * 0.95, r * 0.35);
+            canvasCtx.quadraticCurveTo(0, -r * 0.95, r * 0.95, -r * 0.15);
+            canvasCtx.quadraticCurveTo(r * 0.75, r * 0.05, r * 0.55, -r * 0.05);
+            canvasCtx.quadraticCurveTo(0, -r * 0.55, -r * 0.75, r * 0.55);
+            canvasCtx.closePath();
+            canvasCtx.fill();
+
+            canvasCtx.fillStyle = '#6d4c1f';
+            canvasCtx.beginPath();
+            canvasCtx.ellipse(-r * 0.9, r * 0.4, r * 0.1, r * 0.08, 0.5, 0, Math.PI * 2);
+            canvasCtx.fill();
+            canvasCtx.beginPath();
+            canvasCtx.ellipse(r * 0.92, -r * 0.15, r * 0.09, r * 0.08, -0.3, 0, Math.PI * 2);
+            canvasCtx.fill();
+
+            canvasCtx.strokeStyle = 'rgba(255,255,255,0.5)';
+            canvasCtx.lineWidth = r * 0.06;
+            canvasCtx.lineCap = 'round';
+            canvasCtx.beginPath();
+            canvasCtx.moveTo(-r * 0.6, r * 0.05);
+            canvasCtx.quadraticCurveTo(0, -r * 0.6, r * 0.6, -r * 0.15);
+            canvasCtx.stroke();
+            canvasCtx.restore();
+        }
+
+        function drawGrape(r) {
+            canvasCtx.strokeStyle = '#5d4037';
+            canvasCtx.lineWidth = r * 0.08;
+            canvasCtx.beginPath();
+            canvasCtx.moveTo(0, -r * 0.95);
+            canvasCtx.lineTo(0, -r * 1.15);
+            canvasCtx.stroke();
+            canvasCtx.fillStyle = '#66bb6a';
+            canvasCtx.beginPath();
+            canvasCtx.ellipse(r * 0.18, -r * 1.05, r * 0.2, r * 0.11, -0.5, 0, Math.PI * 2);
+            canvasCtx.fill();
+
+            const positions = [
+                [0, -r * 0.32], [-r * 0.4, -r * 0.02], [r * 0.4, -r * 0.02],
+                [-r * 0.2, r * 0.32], [r * 0.2, r * 0.32], [0, r * 0.62],
+                [-r * 0.42, r * 0.6], [r * 0.42, r * 0.6]
+            ];
+            const grapeR = r * 0.32;
+            for (const [gx, gy] of positions) {
+                const grad = canvasCtx.createRadialGradient(gx - grapeR * 0.3, gy - grapeR * 0.3, grapeR * 0.1, gx, gy, grapeR);
+                grad.addColorStop(0, '#ce93d8');
+                grad.addColorStop(0.55, '#8e24aa');
+                grad.addColorStop(1, '#4a148c');
+                canvasCtx.fillStyle = grad;
+                canvasCtx.beginPath();
+                canvasCtx.arc(gx, gy, grapeR, 0, Math.PI * 2);
+                canvasCtx.fill();
+            }
+        }
+
+        function drawStrawberry(r) {
+            canvasCtx.fillStyle = '#4caf50';
+            for (let i = 0; i < 5; i++) {
+                const a = (i / 5) * Math.PI * 2 - Math.PI / 2;
+                canvasCtx.beginPath();
+                canvasCtx.moveTo(0, -r * 0.72);
+                canvasCtx.lineTo(Math.cos(a) * r * 0.38, -r * 0.72 + Math.sin(a) * r * 0.3 - r * 0.05);
+                canvasCtx.lineTo(Math.cos(a + 0.55) * r * 0.38, -r * 0.72 + Math.sin(a + 0.55) * r * 0.3 - r * 0.05);
+                canvasCtx.closePath();
+                canvasCtx.fill();
+            }
+
+            const grad = canvasCtx.createRadialGradient(-r * 0.25, -r * 0.1, r * 0.1, 0, r * 0.1, r * 1.05);
+            grad.addColorStop(0, '#ff8a80');
+            grad.addColorStop(0.5, '#f44336');
+            grad.addColorStop(1, '#c62828');
+            canvasCtx.fillStyle = grad;
+            canvasCtx.beginPath();
+            canvasCtx.moveTo(0, -r * 0.65);
+            canvasCtx.bezierCurveTo(r * 0.9, -r * 0.5, r * 0.85, r * 0.4, 0, r * 1.05);
+            canvasCtx.bezierCurveTo(-r * 0.85, r * 0.4, -r * 0.9, -r * 0.5, 0, -r * 0.65);
+            canvasCtx.closePath();
+            canvasCtx.fill();
+
+            const seedPositions = [
+                [-0.3, -0.1], [0.3, -0.1], [0, -0.35], [-0.45, 0.2], [0.45, 0.2],
+                [-0.2, 0.5], [0.2, 0.5], [0, 0.75], [-0.35, 0.6], [0.35, 0.6]
+            ];
+            canvasCtx.fillStyle = '#fff59d';
+            for (const [sx, sy] of seedPositions) {
+                canvasCtx.save();
+                canvasCtx.translate(sx * r, sy * r + r * 0.05);
+                canvasCtx.rotate(Math.atan2(sy, sx));
+                canvasCtx.beginPath();
+                canvasCtx.ellipse(0, 0, r * 0.035, r * 0.07, 0, 0, Math.PI * 2);
+                canvasCtx.fill();
+                canvasCtx.restore();
+            }
+        }
+
+        function drawWatermelon(r) {
+            const grad = canvasCtx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r);
+            grad.addColorStop(0, '#66bb6a');
+            grad.addColorStop(0.6, '#2e7d32');
+            grad.addColorStop(1, '#1b5e20');
+            canvasCtx.fillStyle = grad;
+            canvasCtx.beginPath();
+            canvasCtx.arc(0, 0, r, 0, Math.PI * 2);
+            canvasCtx.fill();
+
+            canvasCtx.save();
+            canvasCtx.beginPath();
+            canvasCtx.arc(0, 0, r, 0, Math.PI * 2);
+            canvasCtx.clip();
+            canvasCtx.strokeStyle = 'rgba(200,255,200,0.55)';
+            canvasCtx.lineWidth = r * 0.1;
+            canvasCtx.lineCap = 'round';
+            for (let i = -2; i <= 2; i++) {
+                canvasCtx.beginPath();
+                canvasCtx.moveTo(i * r * 0.28, -r * 0.95);
+                canvasCtx.quadraticCurveTo(i * r * 0.28 + r * 0.15, 0, i * r * 0.28, r * 0.95);
+                canvasCtx.stroke();
+            }
             canvasCtx.restore();
 
-            // ไอคอนผลไม้/อุปสรรค วาดตั้งตรงเสมอ (ไม่หมุนตามแผ่นพื้นหลัง) เพื่อให้อ่านง่ายที่สุด
-            canvasCtx.scale(-1, 1); // แก้ไอคอนกลับด้าน เพราะแคนวาสถูก mirror ด้วย CSS
-            canvasCtx.font = `${item.radius * 1.75}px sans-serif`;
-            canvasCtx.textAlign = 'center';
-            canvasCtx.textBaseline = 'middle';
-            canvasCtx.shadowColor = 'rgba(0,0,0,0.25)';
-            canvasCtx.shadowBlur = 4;
-            canvasCtx.fillText(item.icon, 0, 3);
+            canvasCtx.fillStyle = 'rgba(255,255,255,0.3)';
+            canvasCtx.beginPath();
+            canvasCtx.ellipse(-r * 0.3, -r * 0.35, r * 0.16, r * 0.26, -0.4, 0, Math.PI * 2);
+            canvasCtx.fill();
+        }
 
-            canvasCtx.restore();
+        function drawBomb(r) {
+            canvasCtx.strokeStyle = '#5d4037';
+            canvasCtx.lineWidth = r * 0.1;
+            canvasCtx.lineCap = 'round';
+            canvasCtx.beginPath();
+            canvasCtx.moveTo(r * 0.15, -r * 0.85);
+            canvasCtx.quadraticCurveTo(r * 0.5, -r * 1.15, r * 0.35, -r * 1.35);
+            canvasCtx.stroke();
+
+            canvasCtx.fillStyle = '#ffca28';
+            canvasCtx.beginPath();
+            canvasCtx.arc(r * 0.35, -r * 1.35, r * 0.14, 0, Math.PI * 2);
+            canvasCtx.fill();
+            canvasCtx.fillStyle = '#ff7043';
+            canvasCtx.beginPath();
+            canvasCtx.arc(r * 0.35, -r * 1.35, r * 0.07, 0, Math.PI * 2);
+            canvasCtx.fill();
+
+            const grad = canvasCtx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r);
+            grad.addColorStop(0, '#616161');
+            grad.addColorStop(0.6, '#212121');
+            grad.addColorStop(1, '#000000');
+            canvasCtx.fillStyle = grad;
+            canvasCtx.beginPath();
+            canvasCtx.arc(0, 0, r * 0.9, 0, Math.PI * 2);
+            canvasCtx.fill();
+
+            canvasCtx.fillStyle = 'rgba(255,255,255,0.25)';
+            canvasCtx.beginPath();
+            canvasCtx.ellipse(-r * 0.3, -r * 0.3, r * 0.16, r * 0.26, -0.4, 0, Math.PI * 2);
+            canvasCtx.fill();
+        }
+
+        function drawRock(r) {
+            const grad = canvasCtx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r);
+            grad.addColorStop(0, '#bdbdbd');
+            grad.addColorStop(0.6, '#757575');
+            grad.addColorStop(1, '#424242');
+            canvasCtx.fillStyle = grad;
+            canvasCtx.beginPath();
+            canvasCtx.moveTo(-r * 0.85, r * 0.2);
+            canvasCtx.lineTo(-r * 0.55, -r * 0.75);
+            canvasCtx.lineTo(r * 0.15, -r * 0.9);
+            canvasCtx.lineTo(r * 0.85, -r * 0.25);
+            canvasCtx.lineTo(r * 0.7, r * 0.7);
+            canvasCtx.lineTo(-r * 0.2, r * 0.9);
+            canvasCtx.closePath();
+            canvasCtx.fill();
+
+            canvasCtx.strokeStyle = 'rgba(0,0,0,0.35)';
+            canvasCtx.lineWidth = r * 0.05;
+            canvasCtx.beginPath();
+            canvasCtx.moveTo(-r * 0.3, -r * 0.3);
+            canvasCtx.lineTo(r * 0.1, r * 0.1);
+            canvasCtx.lineTo(-r * 0.1, r * 0.5);
+            canvasCtx.stroke();
         }
 
         // --- ระบบอนุภาค ---
