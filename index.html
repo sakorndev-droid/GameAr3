@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AR เกมรับผลไม้แสนสนุก</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;700&family=Mitr:wght@400;600&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary-color: #FF5722;
+            --secondary-color: #4CAF50;
+            --accent-color: #FFEB3B;
+            --bg-gradient: linear-gradient(135deg, #FF9800, #FF5722);
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Mitr', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* ควบคุมอัตราส่วน 16:9 และยืดหยุ่น (Responsive) */
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 56.25vw; /* อัตราส่วน 16:9 */
+            max-width: 177.78vh;
+            max-height: 100vh;
+            background: #2196F3;
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+            overflow: hidden;
+            border-radius: 12px;
+        }
+
+        /* ซ่อนวิดีโอกล้องต้นฉบับ */
+        #webcam {
+            display: none;
+        }
+
+        /* Canvas หลักของเกม */
+        #gameCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            transform: scaleX(-1); /* ส่องกระจกเพื่อให้จับมือได้เป็นธรรมชาติ */
+        }
+
+        /* UI Overlay ด้านบนและล่าง */
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            pointer-events: none; /* ปล่อยให้การคลิกทะลุไปยังองค์ประกอบย่อย */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 15px;
+        }
+
+        .interactive {
+            pointer-events: auto;
+        }
+
+        /* หน้าจอป๊อปอัปต่างๆ (Splash, Pause, Game Over, Win) */
+        .screen-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            background: rgba(0, 0, 0, 0.75);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            color: white;
+            padding: 20px;
+        }
+
+        #splash-screen {
+            background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('https://images.unsplash.com/photo-1615485290382-441e4d049cb5?auto=format&fit=crop&w=1200&q=80');
+            background-size: cover;
+            background-position: center;
+        }
+
+        /* การตกแต่งตัวอักษรและการ์ตูน */
+        .game-title {
+            font-size: 3.5rem;
+            color: var(--accent-color);
+            text-shadow: 4px 4px 0px #d84315, 0 0 20px rgba(255,235,59,0.8);
+            margin-bottom: 10px;
+            animation: bounce 2s infinite;
+        }
+
+        .game-subtitle {
+            font-size: 1.5rem;
+            color: #fff;
+            margin-bottom: 25px;
+            background: rgba(0,0,0,0.5);
+            padding: 5px 20px;
+            border-radius: 20px;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 15px;
+            margin-bottom: 30px;
+            max-width: 800px;
+        }
+
+        .feature-card {
+            background: rgba(255,255,255,0.2);
+            border: 2px solid #fff;
+            border-radius: 15px;
+            padding: 10px;
+            font-size: 1rem;
+            backdrop-filter: blur(5px);
+        }
+
+        /* ปุ่มกดขนาดใหญ่สไตล์การ์ตูน */
+        .btn-main {
+            font-family: 'Mitr', sans-serif;
+            font-size: 2rem;
+            padding: 15px 50px;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            background: linear-gradient(135deg, #4CAF50, #2E7D32);
+            color: white;
+            box-shadow: 0 8px 0 #1B5E20, 0 15px 20px rgba(0,0,0,0.4);
+            transition: all 0.1s ease;
+            text-shadow: 2px 2px 0px rgba(0,0,0,0.4);
+        }
+
+        .btn-main:active {
+            transform: translateY(6px);
+            box-shadow: 0 2px 0 #1B5E20, 0 5px 10px rgba(0,0,0,0.4);
+        }
+
+        /* UI ด้านบนขณะเล่นเกม */
+        .top-hud {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+
+        .hud-item {
+            background: rgba(0, 0, 0, 0.6);
+            color: #fff;
+            padding: 8px 200px 8px 20px; /* เพิ่มพื้นที่ขวาเผื่อแถบสถานะ */
+            border-radius: 30px;
+            border: 2px solid rgba(255,255,255,0.3);
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            position: relative;
+        }
+        
+        .hud-item-compact {
+            padding: 8px 20px;
+        }
+
+        /* ระบบคอนโทรลมุมขวาบน */
+        .controls-group {
+            display: flex;
+            gap: 10px;
+            pointer-events: auto;
+        }
+
+        .btn-circle {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: 2px solid white;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            font-size: 1.2rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* แถบด่านด้านล่าง */
+        .bottom-hud {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 20px;
+        }
+
+        .level-dot {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #555;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            border: 2px solid #fff;
+        }
+
+        .level-dot.completed {
+            background: var(--secondary-color);
+        }
+
+        .level-dot.current {
+            background: var(--primary-color);
+            box-shadow: 0 0 15px var(--primary-color);
+            animation: pulse 1.5s infinite;
+        }
+
+        /* เอฟเฟกต์หน้าจอสั่นเมื่อเสียชีวิต */
+        .shake {
+            animation: shakeAnim 0.3s linear;
+        }
+
+        /* ใบประกาศนียบัตร */
+        #certificate-box {
+            background: #fff;
+            color: #333;
+            padding: 30px;
+            border-radius: 10px;
+            border: 10px double #654321;
+            width: 80%;
+            max-width: 600px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 3px rgba(0,0,0,0.5);
+        }
+
+        .cert-input {
+            font-size: 1.2rem;
+            padding: 8px;
+            width: 80%;
+            text-align: center;
+            margin: 15px 0;
+            border: 2px solid #ccc;
+            border-radius: 5px;
+        }
+
+        /* Animations */
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes shakeAnim {
+            0%, 100% { transform: translate(0, 0); }
+            20%, 60% { transform: translate(-10px, 5px); }
+            40%, 80% { transform: translate(10px, -5px); }
+        }
+
+        /* ซ่อนอิลิเมนต์เมื่อยังไม่ใช้งาน */
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <video id="webcam" autoplay playsinline></video>
+        
+        <canvas id="gameCanvas" width="1280" height="720"></canvas>
+
+        <div class="ui-layer">
+            <div class="top-hud">
+                <div style="display:flex; gap:15px;">
+                    <div class="hud-item hud-item-compact" id="hud-score">🍎 คะแนน: 0</div>
+                    <div class="hud-item hud-item-compact" id="hud-timer">⏱️ เวลา: 30s</div>
+                    <div class="hud-item hud-item-compact" id="hud-lives">❤️ ชีวิต: ❤️❤️❤️</div>
+                </div>
+                <div class="controls-group">
+                    <button class="btn-circle" id="btn-sound" onclick="toggleSound()">🔊</button>
+                    <button class="btn-circle" id="btn-pause" onclick="togglePause()">⏸️</button>
+                </div>
+            </div>
+
+            <div class="bottom-hud interactive" id="level-indicator">
+                </div>
+        </div>
+
+        <div class="screen-overlay" id="splash-screen">
+            <h1 class="game-title">AR เกมรับผลไม้แสนสนุก</h1>
+            <p class="game-subtitle">ฝึกสมาธิ ฝึกการสังเกต และความไวในการตอบสนอง</p>
+            
+            <div class="features-grid">
+                <div class="feature-card">❤️<br>3 ชีวิต</div>
+                <div class="feature-card">🗺️<br>8 ด่านท้าทาย</div>
+                <div class="feature-card">✨<br>ระบบคะแนน</div>
+                <div class="feature-card">⏱️<br>แข่งกับเวลา</div>
+                <div class="feature-card">🎓<br>รับใบประกาศฯ</div>
+            </div>
+
+            <button class="btn-main interactive" onclick="startGame()">เริ่มผจญภัย 🚀</button>
+        </div>
+
+        <div class="screen-overlay hidden" id="pause-screen">
+            <h1 style="font-size: 3rem; margin-bottom: 20px;">เกมหยุดชั่วคราว</h1>
+            <button class="btn-main interactive" onclick="togglePause()">เล่นต่อ ▶️</button>
+        </div>
+
+        <div class="screen-overlay hidden" id="gameover-screen">
+            <h1 style="font-size: 3.5rem; color: #ff3d00; margin-bottom: 10px;">เกมจบแล้วจ้า! 😭</h1>
+            <p style="font-size: 1.5rem; margin-bottom: 25px;" id="gameover-info">คะแนนที่ทำได้: 0</p>
+            <button class="btn-main interactive" onclick="restartGame()">ลองใหม่อีกครั้ง 🔄</button>
+        </div>
+
+        <div class="screen-overlay hidden" id="levelclear-screen">
+            <h1 style="font-size: 3rem; color: #4caf50; margin-bottom: 10px;">เยี่ยมยอดมาก! 🎉</h1>
+            <p style="font-size: 1.5rem; margin-bottom: 20px;" id="levelclear-info">ผ่านด่านแล้ว</p>
+            <button class="btn-main interactive" onclick="nextLevel()">ไปยังด่านถัดไป ➡️</button>
+        </div>
+
+        <div class="screen-overlay hidden" id="win-screen" style="overflow-y: auto; padding: 50px 20px;">
+            <h1 style="font-size: 3rem; color: #ffd700;">👑 ยินดีด้วยอย่างยิ่ง! 👑</h1>
+            <p style="font-size: 1.2rem; margin-bottom: 15px;">คุณผ่านครบทั้ง 8 อาณาจักรผลไม้แล้ว!</p>
+            
+            <div id="certificate-box" class="interactive">
+                <h2 style="font-family:'Chakra Petch', sans-serif; color: #b58900;">ใบประกาศนียบัตรผู้พิชิต</h2>
+                <p style="margin-top:10px;">มอบให้แก่เพื่อนคนเก่ง</p>
+                <input type="text" id="player-name" class="cert-input" value="น้องผู้กล้า แสนดี" placeholder="พิมพ์ชื่อของคุณที่นี่">
+                <p>ที่ได้เข้าร่วมและผ่านการทดสอบในเกม <b>AR เกมรับผลไม้แสนสนุก</b></p>
+                <p style="margin-top:15px; font-weight: bold;" id="cert-score">คะแนนรวมทั้งหมด: 0 คะแนน</p>
+                <p style="font-size: 0.9rem; color: #777; margin-top: 10px;" id="cert-date">วันที่ปฏิบัติภารกิจสำเร็จ: --/--/----</p>
+            </div>
+
+            <div style="display:flex; gap:15px;" class="interactive">
+                <button class="btn-main" style="font-size:1.2rem; padding: 10px 25px;" onclick="downloadCert()">📸 เซฟภาพ (PNG)</button>
+                <button class="btn-main" style="font-size:1.2rem; padding: 10px 25px; background: #2196F3; box-shadow: 0 8px 0 #0d47a1;" onclick="restartGame()">เล่นใหม่อีกครั้ง 🔄</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- ส่วนกำหนดค่าข้อมูลด่าน (8 ด่าน) ---
+        const levelThemes = [
+            { name: "สวนผลไม้แสนสุข", bg: "#4CAF50", itemSpeed: 3, spawnRate: 0.02, hazardRate: 0.00, targetScore: 100 },
+            { name: "ป่ามหัศจรรย์", bg: "#009688", itemSpeed: 4, spawnRate: 0.025, hazardRate: 0.05, targetScore: 150 },
+            { name: "เมืองผลไม้ยักษ์", bg: "#FF9800", itemSpeed: 4.5, spawnRate: 0.03, hazardRate: 0.08, targetScore: 200 },
+            { name: "แม่น้ำสตรอว์เบอร์รี", bg: "#E91E63", itemSpeed: 5, spawnRate: 0.03, hazardRate: 0.12, targetScore: 250 },
+            { name: "ภูเขาแอปเปิลโทปาส", bg: "#795548", itemSpeed: 5.5, spawnRate: 0.035, hazardRate: 0.15, targetScore: 300 },
+            { name: "ท้องฟ้าไอศกรีม", bg: "#00BCD4", itemSpeed: 6, spawnRate: 0.035, hazardRate: 0.18, targetScore: 350 },
+            { name: "สายรุ้งเคลือบน้ำตาล", bg: "#9C27B0", itemSpeed: 6.5, spawnRate: 0.04, hazardRate: 0.20, targetScore: 400 },
+            { name: "อาณาจักรผลไม้ในฝัน", bg: "#3F51B5", itemSpeed: 7, spawnRate: 0.045, hazardRate: 0.25, targetScore: 500 }
+        ];
+
+        // --- ตัวแปรควบคุมระบบเกม ---
+        let currentLevel = 0;
+        let score = 0;
+        let totalScore = 0;
+        let lives = 3;
+        let timeLeft = 45; // เวลาในแต่ละด่าน (วินาที)
+        let isPlaying = false;
+        let isPaused = false;
+        let isMuted = false;
+        
+        // อาเรย์เก็บอ็อบเจกต์ในเกม
+        let gameItems = [];
+        let particles = [];
+        let floatingTexts = [];
+
+        // ตัวแปรเกี่ยวกับระบบวิดีโอและแคสวาส
+        const videoElement = document.getElementById('webcam');
+        const canvasElement = document.getElementById('gameCanvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        let indexFingerTip = null; // พิกัดปลายนิ้วชี้ ({x, y})
+
+        // ระบบเสียงสังเคราะห์ (Web Audio API) ป้องกันปัญหาลิขสิทธิ์ไฟล์เสียงภายนอก
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playTone(freq, type, duration) {
+            if (isMuted) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        const soundEffects = {
+            score: () => { playTone(523.25, 'sine', 0.15); setTimeout(() => playTone(659.25, 'sine', 0.2), 80); },
+            hurt: () => { playTone(180, 'sawtooth', 0.4); },
+            win: () => { playTone(587.33, 'triangle', 0.2); setTimeout(() => playTone(880, 'triangle', 0.4), 150); },
+            gameOver: () => { playTone(120, 'square', 0.6); }
+        };
+
+        // --- ระบบดึงข้อมูลและบันทึกข้อมูล (Local Storage) ---
+        function loadGameProgress() {
+            const savedLevel = localStorage.getItem('ar_fruit_level');
+            const savedHighScore = localStorage.getItem('ar_fruit_highscore');
+            if (savedLevel) {
+                currentLevel = parseInt(savedLevel);
+                if(currentLevel > 7) currentLevel = 0;
+            }
+        }
+
+        function saveGameProgress() {
+            localStorage.setItem('ar_fruit_level', currentLevel);
+            let currentHighScore = localStorage.getItem('ar_fruit_highscore') || 0;
+            if(totalScore + score > currentHighScore) {
+                localStorage.setItem('ar_fruit_highscore', totalScore + score);
+            }
+        }
+
+        // --- ตั้งค่าระบบ MediaPipe Hands ---
+        const hands = new Hands({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+        });
+
+        hands.setOptions({
+            maxNumHands: 1,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+
+        hands.onResults((results) => {
+            indexFingerTip = null;
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const landmarks = results.multiHandLandmarks[0];
+                // ปลายนิ้วชี้คือจุดตรวจจับที่ 8 ในสารบบของ MediaPipe
+                indexFingerTip = {
+                    x: landmarks[8].x * canvasElement.width,
+                    y: landmarks[8].y * canvasElement.height
+                };
+            }
+        });
+
+        // เปิดใช้งานกล้องคอมพิวเตอร์/มือถือ
+        const camera = new Camera(videoElement, {
+            onFrame: async () => {
+                await hands.send({ image: videoElement });
+            },
+            width: 1280,
+            height: 720
+        });
+        camera.start();
+
+        // --- เริ่มการตั้งค่าอินเทอร์เฟซด่านด้านล่าง ---
+        function renderLevelIndicator() {
+            const container = document.getElementById('level-indicator');
+            container.innerHTML = '';
+            for (let i = 0; i < 8; i++) {
+                const dot = document.createElement('div');
+                dot.className = 'level-dot';
+                dot.innerText = i + 1;
+                if (i < currentLevel) dot.className += ' completed';
+                else if (i === currentLevel) dot.className += ' current';
+                container.appendChild(dot);
+            }
+        }
+
+        // --- ฟังก์ชันควบคุมฉากและกลไกหลัก ---
+        function startGame() {
+            loadGameProgress();
+            document.getElementById('splash-screen').classList.add('hidden');
+            initLevel();
+        }
+
+        let gameInterval = null;
+        function initLevel() {
+            renderLevelIndicator();
+            score = 0;
+            lives = 3;
+            timeLeft = 45;
+            gameItems = [];
+            particles = [];
+            floatingTexts = [];
+            isPlaying = true;
+            isPaused = false;
+            
+            document.getElementById('levelclear-screen').classList.add('hidden');
+            document.getElementById('gameover-screen').classList.add('hidden');
+            updateHUD();
+
+            if(!gameInterval) {
+                gameInterval = setInterval(gameTimerTick, 1000);
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function gameTimerTick() {
+            if (!isPlaying || isPaused) return;
+            timeLeft--;
+            updateHUD();
+
+            if (timeLeft <= 0) {
+                // ตรวจสอบเงื่อนไขคะแนนผ่านด่าน
+                const theme = levelThemes[currentLevel];
+                if (score >= theme.targetScore) {
+                    levelCleared();
+                } else {
+                    gameOver();
+                }
+            }
+        }
+
+        function updateHUD() {
+            const theme = levelThemes[currentLevel];
+            document.getElementById('hud-score').innerText = `🍎 คะแนน: ${score} / ${theme.targetScore}`;
+            document.getElementById('hud-timer').innerText = `⏱️ เวลา: ${timeLeft} วินาที`;
+            document.getElementById('hud-lives').innerText = `❤️ ชีวิต: ` + `❤️`.repeat(Math.max(0, lives));
+        }
+
+        // --- การสร้างไอเทมผลไม้และอุปสรรคหล่นลงมา ---
+        const fruits = [
+            { icon: "🍎", score: 10, isBomb: false },
+            { icon: "🍊", score: 10, isBomb: false },
+            { icon: "🍌", score: 10, isBomb: false },
+            { icon: "🍇", score: 10, isBomb: false },
+            { icon: "🍓", score: 10, isBomb: false },
+            { icon: "💣", score: -1, isBomb: true }, // ระเบิด
+            { icon: "🪨", score: -1, isBomb: true }  // หินกีดขวาง
+        ];
+
+        function spawnItem() {
+            const theme = levelThemes[currentLevel];
+            if (Math.random() < theme.spawnRate) {
+                const isHazard = Math.random() < theme.hazardRate;
+                let pool = fruits.filter(f => isHazard ? f.isBomb : !f.isBomb);
+                if (pool.length === 0) pool = fruits.filter(f => !f.isBomb);
+                
+                const type = pool[Math.floor(Math.random() * pool.length)];
+                gameItems.push({
+                    x: Math.random() * (canvasElement.width - 100) + 50,
+                    y: -50,
+                    speed: theme.itemSpeed + (Math.random() * 2),
+                    icon: type.icon,
+                    score: type.score,
+                    isBomb: type.isBomb,
+                    radius: 45
+                });
+            }
+        }
+
+        // --- ลูปหลักการเรนเดอร์และคำนวณฟิสิกส์ (Game Loop) ---
+        function gameLoop() {
+            if (!isPlaying) return;
+
+            if (!isPaused) {
+                // 1. วาดสตรีมภาพจากกล้องเว็บแคมลงบนแคนวาส
+                canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+                canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+
+                // เติมสีโปร่งแสงบางๆ เป็นธีมพื้นหลังตามแต่ละด่าน
+                const theme = levelThemes[currentLevel];
+                canvasCtx.fillStyle = theme.bg + "22"; // 22 คือความโปร่งแสง Hex
+                canvasCtx.fillRect(0,
