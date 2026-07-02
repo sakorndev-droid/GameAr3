@@ -636,7 +636,7 @@
                 if (pool.length === 0) pool = fruits.filter(f => !f.isBomb);
 
                 const type = pool[Math.floor(Math.random() * pool.length)];
-                const radius = 42 + Math.random() * 12;
+                const radius = 48 + Math.random() * 14;
                 gameItems.push({
                     x: Math.random() * (canvasElement.width - 140) + 70,
                     y: -radius,
@@ -761,14 +761,41 @@
         function drawItem(item) {
             canvasCtx.save();
             canvasCtx.translate(item.x, item.y);
+
+            // แผ่นพื้นหลังทึบแสง ช่วยให้ไอเทมเด่นชัดจากภาพกล้องด้านหลังเสมอ
+            canvasCtx.save();
             canvasCtx.rotate(item.rotation);
-            canvasCtx.font = `${item.radius * 2}px sans-serif`;
+            const plateRadius = item.radius * 1.08;
+
+            canvasCtx.shadowColor = 'rgba(0,0,0,0.5)';
+            canvasCtx.shadowBlur = 16;
+            canvasCtx.shadowOffsetY = 6;
+            canvasCtx.beginPath();
+            canvasCtx.arc(0, 0, plateRadius, 0, Math.PI * 2);
+            canvasCtx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+            canvasCtx.fill();
+            canvasCtx.shadowBlur = 0;
+            canvasCtx.shadowOffsetY = 0;
+
+            // ขอบสีแยกประเภทให้เห็นชัดเจนแต่ไกล: เขียว = ผลไม้เก็บได้, แดง = อันตรายห้ามโดน
+            if (item.isBomb) {
+                canvasCtx.shadowColor = '#ff1744';
+                canvasCtx.shadowBlur = 18;
+            }
+            canvasCtx.lineWidth = 6;
+            canvasCtx.strokeStyle = item.isBomb ? '#ff1744' : '#43a047';
+            canvasCtx.stroke();
+            canvasCtx.shadowBlur = 0;
+            canvasCtx.restore();
+
+            // ไอคอนผลไม้/อุปสรรค วาดตั้งตรงเสมอ (ไม่หมุนตามแผ่นพื้นหลัง) เพื่อให้อ่านง่ายที่สุด
+            canvasCtx.font = `${item.radius * 1.75}px sans-serif`;
             canvasCtx.textAlign = 'center';
             canvasCtx.textBaseline = 'middle';
-            canvasCtx.shadowColor = 'rgba(0,0,0,0.45)';
-            canvasCtx.shadowBlur = 12;
-            canvasCtx.shadowOffsetY = 4;
-            canvasCtx.fillText(item.icon, 0, 0);
+            canvasCtx.shadowColor = 'rgba(0,0,0,0.25)';
+            canvasCtx.shadowBlur = 4;
+            canvasCtx.fillText(item.icon, 0, 3);
+
             canvasCtx.restore();
         }
 
